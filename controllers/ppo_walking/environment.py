@@ -9,7 +9,7 @@ class Environment():
         Use reset() function to initialize and reset state
     """
 
-    def __init__(self, robot):
+    def __init__(self, robot):#大概率要改，添加旋转相关的信息
 
         print("Starting Environment...")
         self.state = None
@@ -29,7 +29,7 @@ class Environment():
 
         self.timestep = int(robot.getBasicTimeStep())
 
-        self.gps = robot.getGPS('gps')
+        self.gps = robot.getGPS('gps') #???
         self.gps.enable(self.timestep)
 
         # intialize position, distance, and timestep counter
@@ -42,7 +42,7 @@ class Environment():
         self.total_reward_contents = np.zeros((9,), dtype=np.float32)
 
                 
-        # values from https://www.cyberbotics.com/doc/guide/nao
+        # values from https://www.cyberbotics.com/doc/guide/nao #登不上去。。。
         # NAO Left Foot Motors
         self.l_ankle_pitch = robot.getMotor('LAnklePitch') # (-1.18 to 0.92)
         self.l_ankle_roll = robot.getMotor('LAnkleRoll')  # (-0.76 to 0.39) ??
@@ -96,19 +96,19 @@ class Environment():
         self.l_shoulder_pitch = robot.getMotor('LShoulderPitch')
         self.r_shoulder_pitch = robot.getMotor('RShoulderPitch')
 
-        # NAO accelerometer
+        # NAO accelerometer 加速计???
         self.accelerometer = robot.getAccelerometer('accelerometer')
         self.accelerometer.enable(self.timestep)
 
-        # NAO gyroscope
+        # NAO gyroscope 陀螺仪???
         self.gyro = robot.getGyro('gyro')
         self.gyro.enable(self.timestep)
 
-        # NAO inertial unit
+        # NAO inertial unit 惯性单元
         self.inertial_unit = robot.getInertialUnit('inertial unit')
         self.inertial_unit.enable(self.timestep)
 
-        # NAO position sensors
+        # NAO position sensors 位置传感器
         self.l_ankle_pitch_pos = robot.getPositionSensor('LAnklePitchS')
         self.l_ankle_pitch_pos.enable(self.timestep)
         # self.l_ankle_roll_pos = robot.getPositionSensor('LAnkleRollS')
@@ -142,6 +142,7 @@ class Environment():
         self.l_shoulder_pitch_pos.enable(self.timestep)
 
     # change motor postion depending on given action vector
+    # 执行动作得到下一个state
     def _act(self, action_vector):
         # convert to double, setPostion does not like floats
         action_vector = np.array(action_vector, dtype=np.float64)
@@ -150,6 +151,7 @@ class Environment():
             self.motors[i].setPosition(action_vector[i])
             
     # build state vector from values provided by position sensors
+    # 根据位置传感器提供的值构建状态向量 state是状态向量
     def _build_state(self):
         state = []
 
@@ -216,6 +218,7 @@ class Environment():
         return state
 
     # clip predicted action in allowed action bounds
+    # 在允许的操作边界中裁剪预测的操作
     def _transform_action(self, action_vector):
 
         # action_vector = np.clip(action_vector, -1, 1)
@@ -246,26 +249,31 @@ class Environment():
         return state
 
     # returns accumulated rewards from sub-objectives
+    # 从子目标获得累积奖励的回报
     def reward_info(self):
         print(self.total_reward_contents)
         return self.total_reward_contents
 
     # perform simulation step
+    # 模拟
     def step(self, action, is_skip=False):
         done = False
         self.iternation += 1
 
         # get current x positon and compute change
+        # getposition的[0]应该就是x
         position = self.robot_center.getPosition()[0]
         distance = position - self.last_position
         self.last_position = position
         
         # clip action if required, execute action afterwards
+        # 如果需要，剪辑操作，然后执行操作(防止出现不合理动作)
         action_vector = action
         action_vec, rescaled_action_vector = self._transform_action(action_vector)
         self._act(rescaled_action_vector)
 
         # read custom data field from robot node, finished if supervisor wrote 'reset'
+        # 从机器人节点读取自定义数据字段，如果写入“重置”，则结束
         custom_data = self.robot.getCustomData()
         if custom_data == "reset":
             done = True
@@ -300,12 +308,12 @@ class Environment():
         # alive bonus
         alive_reward = 0.75
 
-        # motor movement penalty    
+        # motor movement penalty 同下
         movement = np.array(self.state)[-8:] - np.array(old_state)[-8:]
         
         movement_penalty = 2 * np.sum(np.square(movement))
 
-        # action clip penalty
+        # action clip penalty 没看懂设置这个的必要
         clip_actions = action_vec - rescaled_action_vector
         clip_action_penalty = 0.05 * np.sum(np.square(clip_actions))
 
@@ -316,10 +324,10 @@ class Environment():
         self.total_reward_contents[3] -= clip_action_penalty
         self.total_reward_contents[4] -= target_distance_penalty
 
-        # total reward is reward sum of all sub-objectives
+        # total reward is reward sum of all sub-objectives 好花，没看明白
         reward = distance_reward + alive_reward - fall_penalty - movement_penalty - clip_action_penalty - target_distance_penalty
         # make reward smaller, so that MSE critic updates do not get to large
         reward = reward / 20.0
 
-        return next_state, reward, done
+        return next_state, reward, done #rl典中典返回值
 

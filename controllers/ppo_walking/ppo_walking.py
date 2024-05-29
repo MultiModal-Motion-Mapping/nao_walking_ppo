@@ -21,12 +21,15 @@ port = 50005    # random unused port
 client_socket = socket.socket()
 client_socket.connect((host, port))
 
-def get_action(state):
+def get_action(state): #感觉知道返回值的意义就行(网络啥的真不会,也不知道咋和agent联系起来，估计和socket有关)
     """ Get prediction for new action from RL-agent. 
         Use state as input for actor network.
         State is send to the external RL-agent over socket. 
         Data is serialized and de-serialized using pickle.
-
+    从 RL-agent 获取新操作的预测。
+    使用状态作为执行组件网络的输入。
+    状态通过套接字发送到外部 RL 代理。
+    使用 pickle 对数据进行序列化和反序列化。
     Args:
         state: the current state of the environment
     Returns:
@@ -106,10 +109,16 @@ reward_skip_step = 0
 while robot.step(timestep) != -1: 
 
     # Lower action sampling frequency is implemented using action skip. 
+    # 使用动作跳跃实现较低的动作采样频率。就是设置4的意义?
     # Higher frequency in webots leads to higher inacurracies in physics simulation.
+    # 网络机器人的频率越高，物理模拟的误差就越高。
+    # 百度翻译的，其实没咋看懂这两句的意思
     if step % skip == 0:
         # Get action, probs, and value estimate from agent
         action, old_log_probs, value = get_action(state)
+
+        print("ppo_walking_{}",action)
+        print(type(action))
 
         # Perform step in environment 
         next_state, reward, done = env.step(action)
@@ -125,9 +134,11 @@ while robot.step(timestep) != -1:
         batch_old_log_probs.append(old_log_probs)
         batch_rewards.append(reward)
         batch_value.append(np.asscalar(value))
+        #batch_value.append(value.item())
 
     else:
         # repeat old action and add rewards to the origial timestep
+        # why?有什么意义
         next_state, reward, done = env.step(action, is_skip=True)
         reward_skip_step += reward
 
@@ -144,7 +155,7 @@ while robot.step(timestep) != -1:
     if done:
         print("Step {} Score {}".format(step // skip, total_reward))
 
-        # compute discounted rewards
+        # compute discounted rewards 典中典，可以看出gamma是0.99
         rewards = np.array(batch_rewards, dtype=np.float32)
         tmp_discounted_rewards = []
         last_r = 0

@@ -13,7 +13,7 @@ def compute_std(step):
 
 # Agent
 agent = Agent(state_size=16, action_size=8)
-agent.update_actor_model()
+# agent.update_actor_model()
 
 # Trajectory Storage
 horizon = 1024
@@ -36,7 +36,7 @@ batch_advantages = []
 step = 0 
 episode = 0
 last_episode_scores = deque(maxlen=250)
-save_frequency = 2000  # Every 2000 updates save graph
+save_frequency = 20  # Every 2000 updates save graph
 
 host = socket.gethostname()  # as both code is running on same pc
 port = 50005  # socket server port number
@@ -52,24 +52,26 @@ while True:
 
     while True:
 
-        data = conn.recv(2048)
+        data = conn.recv(2048) #2K字节
 
         if data:
             log_std = np.stack([np.ones((8,), dtype=np.float32) * compute_std(step)])
 
             message = None # sometimes this computer is to fast, wait 1 sec in case of error
-            message = pickle.loads(data)
+            message = pickle.loads(data) #无法理解，下面只能抽象地理解
 
             method = message['method']
 
-            if method == 'action':
+            if method == 'action': #反正这个应该是act从policy得到的动作，然后交给webots
                 state = message['state']
-                action, old_log_probs, value = agent.act(state, log_std, step)
+                #action, old_log_probs, value = agent.act(state,log_std,step)
+                action, old_log_probs, value = agent.act(state)
                 reply = [action, old_log_probs, value]
+                #print(action,type(action))
                 reply_bytes = pickle.dumps(reply)
                 conn.sendall(reply_bytes)
 
-            if method == 'log':
+            if method == 'log': #应该就是存模型
                     ep_step, total_reward = message['data'][0], message['data'][1]
                     step += ep_step
                     batch_step += ep_step
@@ -99,8 +101,8 @@ while True:
 
                     reward_info = message['reward_info']
 
-                    agent.log_score(step, total_reward, score_std, episode)
-                    agent.log_reward_info(step, reward_info, ep_step, episode)
+                    # agent.log_score(step, total_reward, score_std, episode)
+                    # agent.log_reward_info(step, reward_info, ep_step, episode)
 
 
                     if batch_step > horizon:
@@ -142,13 +144,13 @@ while True:
                                 train_advantages = advantages[start_idx:end_idx]
                                 train_log_stds = log_stds[start_idx:end_idx]
 
-                                _, summary = agent.train(states=train_state, actions=train_actions,
+                                agent.train(states=train_state, actions=train_actions,
                                                          rewards=train_rewards, old_log_probs=train_old_log_probs,
                                                          advantages=train_advantages, log_stds=train_log_stds)
 
 
-                        agent.log_summary(summary=summary, step=step)
-                        agent.update_actor_model()
+                        #agent.log_summary(summary=summary, step=step)
+                        #agent.update_actor_model()
 
 
                         # Reset for next batch
